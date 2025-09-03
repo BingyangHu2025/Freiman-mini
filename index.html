@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Freiman Sumset Puzzle</title>
+  <style>
+    :root{
+      --bg: #0f172a;           /* slate-900 */
+      --panel: #111827ee;      /* gray-900 */
+      --ink: #e5e7eb;          /* gray-200 */
+      --muted: #94a3b8;        /* slate-400 */
+      --brand: #22d3ee;        /* cyan-400 */
+      --accent: #a78bfa;       /* violet-400 */
+      --good: #34d399;         /* green-400 */
+      --bad: #f87171;          /* red-400 */
+      --warn: #fbbf24;         /* amber-400 */
+      --chip: #1f2937;         /* gray-800 */
+      --chip-ink:#cbd5e1;      /* slate-300 */
+    }
+    html,body{height:100%}
+    body{
+      margin:0;
+      background: radial-gradient(1200px 600px at 15% -10%, #1f2937 0%, #0b1226 40%, var(--bg) 70%) no-repeat fixed;
+      color:var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      line-height:1.55;
+    }
+    .wrap{max-width:980px;margin:0 auto;padding:24px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:20px}
+    .title{font-weight:800;letter-spacing:0.2px;font-size:clamp(20px,3.5vw,32px)}
+    .subtitle{color:var(--muted);font-size:14px}
+    .card{background:linear-gradient( to bottom right, #0b1226aa, #0b1226dd );
+      border:1px solid #24324e; box-shadow: 0 10px 30px rgba(0,0,0,.35); border-radius:18px; padding:18px 18px;}
+    .grid{display:grid; gap:14px}
+    .cols{grid-template-columns: 1.2fr 1fr}
+    @media (max-width:900px){ .cols{grid-template-columns: 1fr} }
+
+    .badge{display:inline-flex;align-items:center;gap:8px;background:#0b1226;border:1px solid #22314f;color:var(--chip-ink);border-radius:999px;padding:6px 12px;font-size:13px}
+
+    .sumset{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+    .chip{background:var(--chip); color:var(--chip-ink); padding:6px 10px; border-radius:10px; border:1px solid #2b3a59; font-weight:600;}
+
+    .nums{display:grid; grid-template-columns: repeat(10, minmax(0,1fr)); gap:8px}
+    .num-btn{background:#0b1226; border:1px solid #2b3a59; border-radius:12px; padding:10px 0; font-size:18px; font-weight:800; color:var(--ink); cursor:pointer; transition: transform .08s ease, background .2s ease, border-color .2s ease}
+    .num-btn[aria-pressed="true"]{background: #133154; border-color:#2ab3d1; box-shadow: inset 0 0 0 2px #164e63}
+    .num-btn:disabled{opacity:.45; cursor:not-allowed}
+    .num-btn:active{transform:translateY(1px)}
+
+    .pick-bar{display:flex; flex-wrap:wrap; gap:8px}
+    .pick{background:#132033; border:1px dashed #2b3a59; color:#c7d2fe; padding:6px 10px; border-radius:10px; font-weight:700}
+
+    .controls{display:flex; gap:10px; flex-wrap:wrap}
+    .btn{appearance:none; border:1px solid #2b3a59; background:#0b1226; padding:10px 14px; border-radius:12px; color:var(--ink); font-weight:700; cursor:pointer}
+    .btn.primary{background: linear-gradient(120deg, #0ea5b7, #7c3aed); border: none}
+    .btn.good{background: linear-gradient(120deg, #16a34a, #059669); border: none}
+    .btn.bad{background: linear-gradient(120deg, #dc2626, #b91c1c); border: none}
+    .btn:hover{filter:brightness(1.06)}
+
+    .timer{display:flex; align-items:center; gap:12px}
+    .clock{ --size:64px; width:var(--size); height:var(--size); border-radius:50%;
+      display:grid; place-items:center; position:relative; background:conic-gradient(var(--brand) var(--pct, 0%), #23314d 0);
+      box-shadow: 0 8px 20px rgba(0,0,0,.35);}
+    .clock::after{content:""; position:absolute; inset:6px; background: #0b1226; border-radius:50%; border:1px solid #22314f}
+    .clock span{ position:relative; z-index:2; font-weight:900 }
+
+    .status{padding:12px 14px; border-radius:12px; border:1px solid #263657; background:#0b1226; color:var(--muted)}
+    .status strong{color:var(--ink)}
+
+    details{background:#0b1226; border:1px solid #22314f; border-radius:14px; padding:12px 14px}
+    summary{cursor:pointer; font-weight:800}
+    .foot{margin-top:18px; color:var(--muted); font-size:12.5px}
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .hint{color:#fcd34d}
+    .diff{display:flex; flex-wrap:wrap; gap:8px; margin-top:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <div class="title">Freiman Sumset Puzzle <span class="subtitle">(A ⊂ {0,…,9}, |A| = 4; given A+A, recover A)</span></div>
+        <div class="subtitle">Pick four distinct numbers so that their sumset matches the shown <span class="mono">A+A</span>.</div>
+      </div>
+      <div class="timer">
+        <div class="clock" id="clock"><span id="tshow">150</span></div>
+        <span class="subtitle">Countdown</span>
+      </div>
+    </header>
+
+    <section class="grid cols">
+      <div class="card">
+        <div class="badge" style="margin-bottom:10px">Target <strong style="margin-left:6px">A+A</strong> (unique sums)</div>
+        <div class="sumset" id="sumset"></div>
+        <div class="status" id="meta" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px">
+          <div class="badge">Your guess A (4 distinct elements)</div>
+          <div class="subtitle">Universe: {0…9}</div>
+        </div>
+
+        <div class="pick-bar" id="picked" style="margin-bottom:10px"></div>
+        <div class="nums" id="nums"></div>
+
+        <div class="controls" style="margin-top:12px">
+          <button id="submit" class="btn primary" disabled>Submit</button>
+          <button id="reveal" class="btn bad" title="Show one valid answer">Reveal A</button>
+          <button id="new" class="btn">New Puzzle</button>
+          <button id="solveAll" class="btn">Check all solutions</button>
+        </div>
+
+        <div id="feedback" class="status" style="margin-top:10px; display:none"></div>
+      </div>
+    </section>
+
+    <section class="card" style="margin-top:16px">
+      <h3 style="margin:6px 0 10px">How to play</h3>
+      <ol style="margin:0; padding-left:18px">
+        <li>The system secretly chooses 4 distinct numbers from {0,…,9} to form A, and shows <span class="mono">A+A</span> (all sums a+b with a,b∈A, deduplicated).</li>
+        <li>Click numbers below to build your guess A (4 numbers).</li>
+        <li>Click <em>Submit</em>. If the sumset from your A matches the target <span class="mono">A+A</span> exactly, you win. Click <em>New Puzzle</em> to try another.</li>
+        <li>You have 150 seconds. After time is up, you can keep experimenting but it counts as overtime.</li>
+      </ol>
+    </section>
+
+    <section class="card" style="margin-top:14px">
+      <details open>
+        <summary>A bite-size Freiman theorem</summary>
+        <p style="margin-top:10px">
+          In additive combinatorics, <strong>Freiman's theorem</strong> describes the structure of sets with <em>small doubling</em>:
+          if a finite set A has a sumset that is not much larger than A itself (e.g. over the integers <span class="mono">|A+A| ≤ K|A|</span> for a modest K),
+          then A must be highly structured — it is contained in a <strong>generalized arithmetic progression</strong> (GAP) of bounded rank and size depending only on K.
+          Intuitively: “if addition creates few new elements, the set is close to arithmetic structure.”
+        </p>
+        <p>
+          This game gives you <span class="mono">A+A</span> and asks you to reverse–engineer A — a playful echo of “structure from small doubling.”
+        </p>
+      </details>
+      <div class="foot">Tip: Different sets <span class="mono">A</span> can yield the same <span class="mono">A+A</span>. Any matching A is accepted. To enumerate all solutions, click <em>Check all solutions</em>.</div>
+    </section>
+  </div>
+
+  <script>
+    // ---------- Utilities ----------
+    const range = (n) => Array.from({length:n}, (_,i)=>i);
+    const combos = (arr, k) => {
+      const res = [];
+      const go = (start, path) => {
+        if (path.length === k) { res.push(path.slice()); return; }
+        for (let i=start; i<=arr.length-(k-path.length); i++){
+          path.push(arr[i]); go(i+1, path); path.pop();
+        }
+      };
+      go(0, []); return res;
+    };
+    const eqSets = (a,b) => a.length===b.length && a.every((v,i)=>v===b[i]);
+
+    function sumset(A){
+      const s = new Set();
+      for (let i=0;i<A.length;i++){
+        for (let j=0;j<A.length;j++){
+          s.add(A[i]+A[j]);
+        }
+      }
+      return Array.from(s).sort((x,y)=>x-y);
+    }
+
+    // ---------- State ----------
+    const U = range(10);  // Universe {0..9}
+    const K = 4;          // |A|=4
+    const LIMIT = 150;    // seconds
+
+    let secretA = [];
+    let targetS = [];
+    let picked = [];
+    let timer = null;
+    let remain = LIMIT;
+    let timedOut = false;
+
+    // ---------- DOM ----------
+    const elNums = document.getElementById('nums');
+    const elPicked = document.getElementById('picked');
+    const elSumset = document.getElementById('sumset');
+    const elMeta = document.getElementById('meta');
+    const elSubmit = document.getElementById('submit');
+    const elReveal = document.getElementById('reveal');
+    const elNew = document.getElementById('new');
+    const elFeedback = document.getElementById('feedback');
+    const elClock = document.getElementById('clock');
+    const elT = document.getElementById('tshow');
+    const elSolveAll = document.getElementById('solveAll');
+
+    function drawUniverse(){
+      elNums.innerHTML = '';
+      U.forEach(n => {
+        const btn = document.createElement('button');
+        btn.className = 'num-btn';
+        btn.setAttribute('data-n', n);
+        btn.setAttribute('aria-pressed', 'false');
+        btn.textContent = n;
+        btn.addEventListener('click', () => togglePick(n, btn));
+        elNums.appendChild(btn);
+      });
+    }
+
+    function paintPicked(){
+      elPicked.innerHTML = '';
+      picked.slice().sort((a,b)=>a-b).forEach(v => {
+        const tag = document.createElement('span');
+        tag.className = 'pick';
+        tag.textContent = v;
+        elPicked.appendChild(tag);
+      });
+      // Enable/disable submit
+      elSubmit.disabled = picked.length !== K;
+      // Update button aria state
+      document.querySelectorAll('.num-btn').forEach(btn => {
+        const n = Number(btn.getAttribute('data-n'));
+        btn.setAttribute('aria-pressed', picked.includes(n) ? 'true' : 'false');
+        btn.disabled = (!picked.includes(n) && picked.length>=K);
+      });
+    }
+
+    function togglePick(n, btn){
+      const i = picked.indexOf(n);
+      if (i>=0) picked.splice(i,1); else if (picked.length<K) picked.push(n);
+      paintPicked();
+    }
+
+    function drawSumset(){
+      elSumset.innerHTML = '';
+      elMeta.innerHTML = '';
+      targetS.forEach(v => {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        chip.textContent = v;
+        elSumset.appendChild(chip);
+      });
+      const info = `|A| = 4, |A+A| = <strong>${targetS.length}</strong>, range [${targetS[0]}, ${targetS[targetS.length-1]}]`;
+      elMeta.innerHTML = info;
+    }
+
+    function feedback(html, tone='neutral'){
+      elFeedback.style.display = 'block';
+      elFeedback.innerHTML = html;
+      if (tone==='good'){ elFeedback.style.borderColor = '#14532d'; elFeedback.style.color = '#d1fae5'; }
+      else if (tone==='bad'){ elFeedback.style.borderColor = '#4c0519'; elFeedback.style.color = '#ffe4e6'; }
+      else { elFeedback.style.borderColor = '#263657'; elFeedback.style.color = '#94a3b8'; }
+    }
+
+    function startTimer(){
+      stopTimer();
+      remain = LIMIT; timedOut = false; updateClock();
+      timer = setInterval(()=>{
+        remain--; updateClock();
+        if (remain<=0){
+          timedOut = true; stopTimer();
+          feedback(`<strong>Time's up ⏰</strong> You can keep working or click <em>Reveal A</em> to see an answer.`, 'bad');
+        }
+      }, 1000);
+    }
+    function stopTimer(){ if (timer){ clearInterval(timer); timer=null; } }
+    function updateClock(){
+      elT.textContent = remain;
+      const pct = Math.max(0, Math.min(1, remain / LIMIT));
+      elClock.style.setProperty('--pct', `${pct*100}%`);
+    }
+
+    function newPuzzle(seedA=null){
+      // Generate secret A
+      if (seedA) secretA = seedA.slice().sort((a,b)=>a-b);
+      else {
+        const arr = U.slice();
+        secretA = [];
+        while (secretA.length<K){
+          const idx = Math.floor(Math.random()*arr.length);
+          secretA.push(arr.splice(idx,1)[0]);
+        }
+        secretA.sort((a,b)=>a-b);
+      }
+      targetS = sumset(secretA);
+      picked = [];
+      paintPicked();
+      drawSumset();
+      feedback('Puzzle ready. Guess an <span class="mono">A</span> whose <span class="mono">A+A</span> matches the target.');
+      startTimer();
+    }
+
+    // ---------- Events ----------
+    elSubmit.addEventListener('click', ()=>{
+      if (picked.length!==K) return;
+      const guess = picked.slice().sort((a,b)=>a-b);
+      const Sg = sumset(guess);
+      if (eqSets(Sg, targetS)){
+        stopTimer();
+        const msg = timedOut
+          ? `<strong>Correct ✔</strong> You found a valid A = {${guess.join(', ')}} — but after time.`
+          : `<strong>Correct ✔</strong> Nice! One valid A is {${guess.join(', ')}}. Time left: ${remain}s.`;
+        feedback(msg, 'good');
+      } else {
+        // Show differences
+        const missing = targetS.filter(x => !Sg.includes(x));
+        const extra = Sg.filter(x => !targetS.includes(x));
+        const chips = (arr) => arr.map(v=>`<span class="chip">${v}</span>`).join(' ');
+        feedback(
+          `<strong>Not yet ✖</strong> Your <span class="mono">A+A</span> does not match.
+           <div class="diff"><span class="hint">Missing (should appear):</span> ${missing.length?chips(missing):'<em>none</em>'}</div>
+           <div class="diff"><span class="hint">Extra (should not appear):</span> ${extra.length?chips(extra):'<em>none</em>'}</div>`
+          ,'bad');
+      }
+    });
+
+    elReveal.addEventListener('click', ()=>{
+      stopTimer();
+      feedback(`<strong>Reveal</strong> One valid answer: A = {${secretA.join(', ')}}. You can also click <em>Check all solutions</em> to see if others exist.`);
+    });
+
+    elNew.addEventListener('click', ()=> newPuzzle());
+
+    elSolveAll.addEventListener('click', ()=>{
+      const all = combos(U, K);
+      const sols = [];
+      for (const c of all){ if (eqSets(sumset(c), targetS)) sols.push(c); }
+      const list = sols.map(s=>`<span class="chip">{${s.join(', ')}}</span>`).join(' ');
+      feedback(`<strong>All solutions</strong> Found <strong>${sols.length}</strong>: ${list || '<em>none</em>'}`);
+    });
+
+    // ---------- Boot ----------
+    drawUniverse();
+    newPuzzle();
+  </script>
+</body>
+</html>
